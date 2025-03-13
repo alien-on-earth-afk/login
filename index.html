@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phone Authentication</title>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            width: 350px;
+            max-width: 90%;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-size: 14px;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            border-color: #4285F4;
+            outline: none;
+        }
+        button {
+            background-color: #4285F4;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            width: 100%;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #3367D6;
+        }
+        button:disabled {
+            background-color: #A4A4A4;
+            cursor: not-allowed;
+        }
+        .hidden {
+            display: none;
+        }
+        .divider {
+            margin: 15px 0;
+            text-align: center;
+            position: relative;
+        }
+        .divider:before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background-color: #ddd;
+            z-index: 1;
+        }
+        .divider-text {
+            background-color: white;
+            padding: 0 10px;
+            position: relative;
+            z-index: 2;
+            color: #777;
+            font-size: 14px;
+        }
+        .error {
+            color: #d93025;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+        .phone-input-container {
+            display: flex;
+            gap: 8px;
+        }
+        .country-code {
+            width: 80px;
+            flex-shrink: 0;
+            position: relative;
+            cursor: pointer;
+        }
+        .country-code:after {
+            content: '▼';
+            font-size: 10px;
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #555;
+            pointer-events: none;
+        }
+        .phone-number {
+            flex-grow: 1;
+        }
+        .country-dropdown {
+            position: absolute;
+            z-index: 100;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            max-height: 200px;
+            overflow-y: auto;
+            width: 200px;
+            display: none;
+        }
+        .country-dropdown.show {
+            display: block;
+        }
+        .country-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .country-item:hover {
+            background-color: #f5f5f5;
+        }
+        .flag {
+            width: 20px;
+            height: 15px;
+            display: inline-block;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        #recaptcha-container {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .otp-input-container {
+            position: relative;
+        }
+        .otp-counter {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #777;
+            font-size: 14px;
+            pointer-events: none;
+        }
+        .otp-input-with-counter {
+            padding-right: 50px;
+        }
+        .resend-container {
+            text-align: center;
+            margin-top: 15px;
+        }
+        .resend-link {
+            color: #4285F4;
+            text-decoration: none;
+            cursor: pointer;
+            display: none;
+        }
+        .resend-link:hover {
+            text-decoration: underline;
+        }
+        .resend-link.show {
+            display: inline;
+        }
+        .resend-timer {
+            color: #777;
+        }
+        .resend-timer.hide {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Login with Phone</h1>
+        
+        <div id="phoneForm">
+            <div class="form-group">
+                <label for="phoneNumber">Phone Number</label>
+                <div class="phone-input-container">
+                    <input type="text" id="countryCode" class="country-code" value="+91" readonly>
+                    <div id="countryDropdown" class="country-dropdown"></div>
+                    <input type="tel" id="phoneNumber" class="phone-number" placeholder="10-digit number" maxlength="10" pattern="[0-9]{10}" autofocus>
+                </div>
+                <div id="phoneError" class="error">Please enter a valid 10-digit phone number</div>
+            </div>
+            
+            <div id="recaptcha-container"></div>
+            
+            <button id="sendOtpBtn">Send OTP</button>
+        </div>
+        
+        <div id="otpForm" class="hidden">
+            <div class="form-group">
+                <label for="otpCode">Enter Verification Code</label>
+                <div class="otp-input-container">
+                    <input type="text" id="otpCode" class="otp-input-with-counter" placeholder="6-digit code" maxlength="6" autofocus>
+                    <span id="otpCounter" class="otp-counter">00:60</span>
+                </div>
+                <div id="otpError" class="error">Please enter a valid verification code</div>
+            </div>
+            
+            <button id="verifyOtpBtn">Verify & Login</button>
+            
+            <div class="resend-container">
+                <span id="resendTimer" class="resend-timer">Resend code in <span id="countdown">60</span>s</span>
+                <a id="resendLink" class="resend-link">Resend code</a>
+            </div>
+            
+            <div class="divider">
+                <span class="divider-text">OR</span>
+            </div>
+            
+            <button id="changePhoneBtn">Change Phone Number</button>
+        </div>
+    </div>
+
+    <script>
+        // REPLACE WITH YOUR FIREBASE CONFIG
+        const firebaseConfig = {
+            apiKey: "AIzaSyACECKbMYTGmVR16brPoPG_RMIfgg8pu8U",
+            authDomain: "aliennode.firebaseapp.com",
+            projectId: "aliennode",
+            storageBucket: "aliennode.firebasestorage.app",
+            messagingSenderId: "703412476550",
+            appId: "1:703412476550:web:48670ac9771f288cab0f07"
+        };
+
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth(app);
+
+        const countryCodes = [
+            { code: "+91", country: "India", flag: "🇮🇳" },
+            { code: "+1", country: "United States", flag: "🇺🇸" },
+            { code: "+44", country: "United Kingdom", flag: "🇬🇧" },
+            { code: "+61", country: "Australia", flag: "🇦🇺" },
+            { code: "+86", country: "China", flag: "🇨🇳" },
+            { code: "+49", country: "Germany", flag: "🇩🇪" },
+            { code: "+33", country: "France", flag: "🇫🇷" },
+            { code: "+81", country: "Japan", flag: "🇯🇵" },
+            { code: "+7", country: "Russia", flag: "🇷🇺" },
+            { code: "+55", country: "Brazil", flag: "🇧🇷" },
+            { code: "+27", country: "South Africa", flag: "🇿🇦" },
+            { code: "+966", country: "Saudi Arabia", flag: "🇸🇦" },
+            { code: "+971", country: "United Arab Emirates", flag: "🇦🇪" },
+            { code: "+65", country: "Singapore", flag: "🇸🇬" },
+            { code: "+60", country: "Malaysia", flag: "🇲🇾" }
+        ];
+
+        // DOM Elements
+        const phoneForm = document.getElementById('phoneForm');
+        const otpForm = document.getElementById('otpForm');
+        const countryCode = document.getElementById('countryCode');
+        const countryDropdown = document.getElementById('countryDropdown');
+        const phoneNumber = document.getElementById('phoneNumber');
+        const otpCode = document.getElementById('otpCode');
+        const otpCounter = document.getElementById('otpCounter');
+        const sendOtpBtn = document.getElementById('sendOtpBtn');
+        const verifyOtpBtn = document.getElementById('verifyOtpBtn');
+        const changePhoneBtn = document.getElementById('changePhoneBtn');
+        const phoneError = document.getElementById('phoneError');
+        const otpError = document.getElementById('otpError');
+        const countdown = document.getElementById('countdown');
+        const resendTimer = document.getElementById('resendTimer');
+        const resendLink = document.getElementById('resendLink');
+
+        let verificationId = '';
+        let countdownInterval;
+
+        function populateCountryDropdown() {
+            countryDropdown.innerHTML = '';
+            countryCodes.forEach(country => {
+                const countryItem = document.createElement('div');
+                countryItem.className = 'country-item';
+                countryItem.innerHTML = `<span class="flag">${country.flag}</span> ${country.country} ${country.code}`;
+                countryItem.addEventListener('click', () => {
+                    countryCode.value = country.code;
+                    countryDropdown.classList.remove('show');
+                });
+                countryDropdown.appendChild(countryItem);
+            });
+        }
+
+        populateCountryDropdown();
+
+        countryCode.addEventListener('click', () => {
+            countryDropdown.classList.toggle('show');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.matches('.country-code') && !e.target.matches('.country-item')) {
+                countryDropdown.classList.remove('show');
+            }
+        });
+
+        window.onload = function() {
+            render();
+        };
+
+        function render() {
+            window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+                'size': 'normal',
+                'callback': (response) => {
+                    sendOtpBtn.disabled = false;
+                },
+                'expired-callback': () => {
+                    sendOtpBtn.disabled = true;
+                    render();
+                }
+            });
+            recaptchaVerifier.render();
+        }
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+        }
+
+        function startCountdown() {
+            let secondsLeft = 60;
+            otpCounter.textContent = formatTime(secondsLeft);
+            countdown.textContent = secondsLeft;
+            resendTimer.classList.remove('hide');
+            resendLink.classList.remove('show');
+            
+            clearInterval(countdownInterval);
+            countdownInterval = setInterval(() => {
+                secondsLeft--;
+                otpCounter.textContent = formatTime(secondsLeft);
+                countdown.textContent = secondsLeft;
+                
+                if (secondsLeft <= 0) {
+                    clearInterval(countdownInterval);
+                    resendTimer.classList.add('hide');
+                    resendLink.classList.add('show');
+                }
+            }, 1000);
+        }
+
+        sendOtpBtn.addEventListener('click', () => {
+            const phone = phoneNumber.value.trim();
+            
+            if (phone.length !== 10 || !/^\d+$/.test(phone)) {
+                phoneError.style.display = 'block';
+                return;
+            }
+            
+            const fullPhoneNumber = countryCode.value + phone;
+            phoneError.style.display = 'none';
+            sendOtpBtn.disabled = true;
+            sendOtpBtn.textContent = 'Sending...';
+            
+            const appVerifier = window.recaptchaVerifier;
+            
+            auth.signInWithPhoneNumber(fullPhoneNumber, appVerifier)
+                .then((confirmationResult) => {
+                    verificationId = confirmationResult.verificationId;
+                    phoneForm.classList.add('hidden');
+                    otpForm.classList.remove('hidden');
+                    otpCode.focus();
+                    startCountdown();
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                    phoneError.textContent = error.message || 'Error sending code';
+                    phoneError.style.display = 'block';
+                    sendOtpBtn.disabled = false;
+                    sendOtpBtn.textContent = 'Send OTP';
+                    window.recaptchaVerifier.render().then(widgetId => {
+                        grecaptcha.reset(widgetId);
+                    });
+                });
+        });
+
+        verifyOtpBtn.addEventListener('click', () => {
+            const code = otpCode.value.trim();
+            
+            if (code.length !== 6 || !/^\d+$/.test(code)) {
+                otpError.textContent = 'Please enter a valid 6-digit code';
+                otpError.style.display = 'block';
+                return;
+            }
+            
+            otpError.style.display = 'none';
+            verifyOtpBtn.disabled = true;
+            verifyOtpBtn.textContent = 'Verifying...';
+            
+            const credential = firebase.auth.PhoneAuthProvider.credential(verificationId, code);
+            
+            auth.signInWithCredential(credential)
+                .then((result) => {
+                    window.location.href = '/dashboard';
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                    otpError.textContent = error.message || 'Invalid code';
+                    otpError.style.display = 'block';
+                    verifyOtpBtn.disabled = false;
+                    verifyOtpBtn.textContent = 'Verify & Login';
+                });
+        });
+
+        resendLink.addEventListener('click', () => {
+            phoneForm.classList.remove('hidden');
+            otpForm.classList.add('hidden');
+            otpCode.value = '';
+            otpError.style.display = 'none';
+            phoneNumber.focus();
+            window.recaptchaVerifier.render().then(widgetId => {
+                grecaptcha.reset(widgetId);
+            });
+        });
+
+        changePhoneBtn.addEventListener('click', () => {
+            otpForm.classList.add('hidden');
+            phoneForm.classList.remove('hidden');
+            phoneNumber.focus();
+            otpCode.value = '';
+            clearInterval(countdownInterval);
+            otpError.style.display = 'none';
+            window.recaptchaVerifier.render().then(widgetId => {
+                grecaptcha.reset(widgetId);
+            });
+        });
+
+        phoneNumber.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') sendOtpBtn.click();
+        });
+        
+        otpCode.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') verifyOtpBtn.click();
+        });
+    </script>
+</body>
+</html>
